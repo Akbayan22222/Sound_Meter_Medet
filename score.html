@@ -1,26 +1,24 @@
 <!DOCTYPE html>
-<html lang="kk">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <title>MEDET SHOW: SOUND BATTLE</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #000; color: #fff; font-family: 'Arial Black', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #winner-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; color: #FFD700; text-shadow: 0 0 50px gold; display: none; z-index: 9999; background: rgba(0,0,0,0.9); padding: 50px; border: 8px solid #FFD700; border-radius: 40px; text-align: center; width: 80%; }
+        #winner-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; color: #FFD700; text-shadow: 0 0 50px gold; display: none; z-index: 9999; background: rgba(0,0,0,0.95); padding: 50px; border: 8px solid #FFD700; border-radius: 40px; text-align: center; width: 80%; text-transform: uppercase; }
         .battle-container { display: flex; width: 90%; justify-content: space-around; align-items: flex-end; height: 60vh; position: relative; }
         .table-bar { width: 40%; display: flex; flex-direction: column; align-items: center; }
         .bar-outer { width: 100%; height: 450px; background: #111; border: 5px solid #333; position: relative; border-radius: 30px; overflow: hidden; }
-        .bar-inner { width: 100%; height: 0%; position: absolute; bottom: 0; transition: height 0.1s ease-out; }
+        .bar-inner { width: 100%; height: 0%; position: absolute; bottom: 0; transition: height 0.3s ease-out; } /* Плавный переход */
         #bar1 { background: linear-gradient(to top, #ff0055, #ff88aa); box-shadow: 0 0 40px #ff0055; }
         #bar2 { background: linear-gradient(to top, #007bff, #00d4ff); box-shadow: 0 0 40px #007bff; }
-        .score { font-size: 100px; margin-top: 20px; font-weight: bold; }
+        .score { font-size: 100px; margin-top: 20px; font-weight: bold; font-family: 'Courier New', monospace; }
         .label { font-size: 40px; margin-bottom: 10px; }
-        #status-dot { position: absolute; top: 20px; right: 20px; width: 15px; height: 15px; background: red; border-radius: 50%; }
     </style>
 </head>
 <body>
-    <div id="status-dot" title="Статус связи"></div>
-    <div id="winner-text">ЖЕҢІМПАЗ!</div>
+    <div id="winner-text">ПОБЕДИТЕЛЬ!</div>
 
     <div class="battle-container">
         <div class="table-bar">
@@ -38,33 +36,46 @@
     <script>
         const ADMIN_ID = 'medet_noise_battle_2026';
         const peer = new Peer(ADMIN_ID);
-        let s1 = 0, s2 = 0;
-
-        peer.on('open', () => document.getElementById('status-dot').style.background = '#00ffcc');
+        let targetS1 = 0, targetS2 = 0; // Куда стремимся
+        let currentS1 = 0, currentS2 = 0; // Что показываем сейчас
 
         peer.on('connection', (conn) => {
             conn.on('data', (data) => {
                 if (data.reset) {
-                    s1 = 0; s2 = 0;
+                    targetS1 = 0; targetS2 = 0;
+                    currentS1 = 0; currentS2 = 0;
                     updateUI();
                     document.getElementById('winner-text').style.display = 'none';
                 }
-                if (data.table === 1 && data.val > s1) { s1 = Math.floor(data.val); updateUI(); }
-                if (data.table === 2 && data.val > s2) { s2 = Math.floor(data.val); updateUI(); }
+                if (data.table === 1 && data.val > targetS1) targetS1 = Math.floor(data.val);
+                if (data.table === 2 && data.val > targetS2) targetS2 = Math.floor(data.val);
                 if (data.finish) {
                     const win = document.getElementById('winner-text');
                     win.style.display = 'block';
-                    win.innerText = s1 > s2 ? "1 СТОЛ ЖЕҢІМПАЗ!" : (s1 < s2 ? "2 СТОЛ ЖЕҢІМПАЗ!" : "ДОСТЫҚ ЖЕҢДІ!");
+                    if (targetS1 > targetS2) win.innerText = "1 СТОЛ - ПОБЕДИТЕЛЬ!";
+                    else if (targetS1 < targetS2) win.innerText = "2 СТОЛ - ПОБЕДИТЕЛЬ!";
+                    else win.innerText = "НИЧЬЯ!";
                 }
             });
         });
 
-        function updateUI() {
-            document.getElementById('bar1').style.height = s1 + '%';
-            document.getElementById('score1').innerText = s1;
-            document.getElementById('bar2').style.height = s2 + '%';
-            document.getElementById('score2').innerText = s2;
+        // Функция плавного "догона" цифр
+        function animate() {
+            if (currentS1 < targetS1) currentS1 += 0.5; // Скорость роста (можно менять)
+            if (currentS2 < targetS2) currentS2 += 0.5;
+
+            updateUI();
+            requestAnimationFrame(animate);
         }
+
+        function updateUI() {
+            document.getElementById('bar1').style.height = currentS1 + '%';
+            document.getElementById('score1').innerText = Math.floor(currentS1);
+            document.getElementById('bar2').style.height = currentS2 + '%';
+            document.getElementById('score2').innerText = Math.floor(currentS2);
+        }
+
+        animate();
     </script>
 </body>
 </html>
