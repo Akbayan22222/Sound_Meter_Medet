@@ -2,82 +2,80 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sound Meter Mic</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mic</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #111; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
-        button { width: 100%; height: 70px; font-size: 18px; margin: 10px 0; border-radius: 15px; border: none; font-weight: bold; text-transform: uppercase; }
+        body { background: #111; color: #fff; font-family: sans-serif; text-align: center; padding: 10px; margin: 0; }
+        button { width: 95%; height: 80px; font-size: 20px; margin: 8px 0; border-radius: 15px; border: none; font-weight: bold; text-transform: uppercase; }
         .btn-1 { background: #ff0055; }
         .btn-2 { background: #007bff; }
-        .btn-reset { background: #444; }
-        .btn-finish { background: gold; color: black; height: 100px; font-size: 24px; }
-        #info { color: #00ffcc; font-weight: bold; margin-top: 15px; }
+        .btn-res { background: #333; height: 50px; font-size: 14px; }
+        .btn-fin { background: gold; color: #000; height: 100px; font-size: 26px; }
+        #log { color: #00ffcc; font-size: 14px; margin: 10px; }
     </style>
 </head>
 <body>
-    <h1>ШУМ-МЕТР</h1>
-    <p id="info">Соединение...</p>
-    
-    <button class="btn-1" onclick="startTest(1)">🎤 1 СТОЛ: ТЕСТ</button>
-    <button class="btn-2" onclick="startTest(2)">🎤 2 СТОЛ: ТЕСТ</button>
-    <br><br>
-    <button class="btn-finish" onclick="finish()">🏆 КТО ЖЕҢІМПАЗ?</button>
-    <button class="btn-reset" onclick="reset()">СБРОСИТЬ РЕЗУЛЬТАТ</button>
+    <div id="log">Инициализация...</div>
+    <button class="btn-res" onclick="reset()">СБРОСИТЬ ЭКРАН</button>
+    <button class="btn-1" onclick="startTest(1)">🎤 1 СТОЛ (СТАРТ)</button>
+    <button class="btn-2" onclick="startTest(2)">🎤 2 СТОЛ (СТАРТ)</button>
+    <button class="btn-fin" onclick="finish()">🏆 КТО ЖЕҢІМПАЗ?</button>
 
     <script>
         const TARGET_ID = 'medet_noise_battle_2026';
-        const peer = new Peer();
+        let peer = new Peer();
         let conn;
         let activeTable = 0;
 
-        peer.on('open', () => {
+        const connect = () => {
             conn = peer.connect(TARGET_ID);
-            document.getElementById('info').innerText = "ЭКРАНҒА ҚОСЫЛДЫ ✅";
-        });
+            conn.on('open', () => document.getElementById('log').innerText = "СВЯЗЬ С ЭКРАНОМ: ОК ✅");
+            conn.on('error', () => document.getElementById('log').innerText = "Ошибка. Переподключение...");
+        };
+
+        peer.on('open', connect);
 
         function reset() { conn.send({reset: true}); activeTable = 0; }
         function finish() { conn.send({finish: true}); activeTable = 0; }
 
-        async function startTest(tableNum) {
-            activeTable = tableNum;
+        async function startTest(tNum) {
+            if (!conn || !conn.open) connect(); // Если связь упала — восстановить!
+            
+            activeTable = tNum;
+            document.getElementById('log').innerText = "ЗАМЕР СТОЛА №" + tNum;
+
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const analyser = audioContext.createAnalyser();
-                const microphone = audioContext.createMediaStreamSource(stream);
-                microphone.connect(analyser);
-                analyser.fftSize = 256;
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                analyser.fftSize = 512;
                 const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-                const checkVolume = () => {
-                    if (activeTable !== tableNum) return;
+                const track = () => {
+                    if (activeTable !== tNum) {
+                        stream.getTracks().forEach(t => t.stop());
+                        audioContext.close();
+                        return;
+                    }
                     analyser.getByteFrequencyData(dataArray);
-                    
                     let sum = 0;
                     for(let i=0; i<dataArray.length; i++) sum += dataArray[i];
-                    let average = sum / dataArray.length;
+                    let avg = sum / dataArray.length;
 
-                    // --- ИСПРАВЛЕННАЯ ФОРМУЛА ЧУВСТВИТЕЛЬНОСТИ ---
-                    // Отнимаем 30 (игнорируем фоновый шум) и умножаем на 1.1 для плавности
-                    let volume = (average - 30) * 1.1; 
-                    if (volume < 0) volume = 0;
-                    if (volume > 100) volume = 100;
-                    
-                    conn.send({ table: tableNum, val: volume });
-                    requestAnimationFrame(checkVolume);
+                    // Чувствительность: отнимаем 25 (шум), умножаем на 1.3
+                    let vol = Math.max(0, (avg - 25) * 1.3);
+                    if (vol > 100) vol = 100;
+
+                    conn.send({ table: tNum, val: vol });
+                    requestAnimationFrame(track);
                 };
-                checkVolume();
-                
-                // Тест длится 6 секунд
-                setTimeout(() => { 
-                    activeTable = 0; 
-                    stream.getTracks().forEach(track => track.stop()); // Выключаем микрофон
-                }, 6000); 
+                track();
+                setTimeout(() => { activeTable = 0; document.getElementById('log').innerText = "ЗАМЕР ЗАВЕРШЕН"; }, 6000);
 
-            } catch (err) {
-                alert("Микрофонға рұқсат беріңіз!");
-            }
+            } catch (err) { alert("Включите микрофон в настройках!"); }
         }
     </script>
 </body>
