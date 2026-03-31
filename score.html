@@ -110,4 +110,25 @@
                 if (data.table === 1) {
                     if (data.val > s1) s1 = Math.floor(data.val);
                     document.getElementById('bar1').style.height = s1 + '%';
-                    document.getElementById('score1').innerText = s
+                    document.getElementById('score1').innerText = s1;
+                }
+                if (data.table === 2) {
+                    if (data.val > s2) s2 = Math.floor(data.val);
+                    document.getElementById('bar2').style.height = s2 + '%';
+                    document.getElementById('score2').innerText = s2;
+                }
+
+                if (data.finish) {
+                    const winText = document.getElementById('winner-text');
+                    winText.style.display = 'block';
+                    if (s1 === s2 && s1 > 0) {
+                        winText.innerText = "ДОСТЫҚ ЖЕҢДІ!";
+                    } else {
+                        winText.innerText = s1 > s2 ? "1 СТОЛ ЖЕҢІМПАЗ!" : "2 СТОЛ ЖЕҢІМПАЗ!";
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
