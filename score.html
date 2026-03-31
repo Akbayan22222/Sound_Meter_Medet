@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>БИТВА ШУМА</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #000; color: #fff; font-family: 'Arial Black', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .battle-container { display: flex; width: 90%; justify-content: space-around; align-items: flex-end; height: 60vh; }
+        .table-bar { width: 35%; display: flex; flex-direction: column; align-items: center; }
+        .bar-outer { width: 100%; height: 400px; background: #222; border: 5px solid #444; position: relative; border-radius: 20px; overflow: hidden; }
+        .bar-inner { width: 100%; height: 0%; position: absolute; bottom: 0; transition: height 0.1s; }
+        #bar1 { background: linear-gradient(to top, #ff0055, #ff5588); box-shadow: 0 0 30px #ff0055; }
+        #bar2 { background: linear-gradient(to top, #007bff, #00d4ff); box-shadow: 0 0 30px #007bff; }
+        .score { font-size: 80px; margin-top: 20px; }
+        .label { font-size: 30px; margin-bottom: 10px; color: #aaa; }
+        #winner-text { position: absolute; top: 50px; font-size: 100px; color: gold; text-shadow: 0 0 50px gold; display: none; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div id="winner-text">ЖЕҢІМПАЗ!</div>
+
+    <div class="battle-container">
+        <div class="table-bar">
+            <div class="label">1 СТОЛ</div>
+            <div class="bar-outer"><div id="bar1" class="bar-inner"></div></div>
+            <div id="score1" class="score">0</div>
+        </div>
+        <div class="table-bar">
+            <div class="label">2 СТОЛ</div>
+            <div class="bar-outer"><div id="bar2" class="bar-inner"></div></div>
+            <div id="score2" class="score">0</div>
+        </div>
+    </div>
+
+    <script>
+        const ADMIN_ID = 'medet_noise_battle_2026';
+        const peer = new Peer(ADMIN_ID);
+        let s1 = 0, s2 = 0;
+
+        peer.on('connection', (conn) => {
+            conn.on('data', (data) => {
+                if (data.reset) {
+                    s1 = 0; s2 = 0;
+                    document.getElementById('bar1').style.height = '0%';
+                    document.getElementById('bar2').style.height = '0%';
+                    document.getElementById('score1').innerText = '0';
+                    document.getElementById('score2').innerText = '0';
+                    document.getElementById('winner-text').style.display = 'none';
+                }
+                
+                if (data.table === 1) {
+                    if (data.val > s1) s1 = Math.floor(data.val);
+                    document.getElementById('bar1').style.height = s1 + '%';
+                    document.getElementById('score1').innerText = s1;
+                }
+                if (data.table === 2) {
+                    if (data.val > s2) s2 = Math.floor(data.val);
+                    document.getElementById('bar2').style.height = s2 + '%';
+                    document.getElementById('score2').innerText = s2;
+                }
+
+                if (data.finish) {
+                    const winText = document.getElementById('winner-text');
+                    winText.style.display = 'block';
+                    winText.innerText = s1 > s2 ? "1 СТОЛ ЖЕҢІМПАЗ!" : "2 СТОЛ ЖЕҢІМПАЗ!";
+                }
+            });
+        });
+    </script>
+</body>
+</html>
