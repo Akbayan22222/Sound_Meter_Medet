@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mic Controller</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #111; color: white; font-family: sans-serif; text-align: center; padding: 20px; }
+        button { width: 100%; height: 80px; font-size: 20px; margin: 10px 0; border-radius: 15px; border: none; font-weight: bold; }
+        .btn-1 { background: #ff0055; color: white; }
+        .btn-2 { background: #007bff; color: white; }
+        .btn-reset { background: #444; color: white; }
+    </style>
+</head>
+<body>
+    <h1>ШУМ-МЕТР</h1>
+    <button class="btn-reset" onclick="reset()">СБРОСИТЬ ВСЁ</button>
+    <button class="btn-1" id="btn1" onclick="startTest(1)">1 СТОЛ: СТАРТ</button>
+    <button class="btn-2" id="btn2" onclick="startTest(2)">2 СТОЛ: СТАРТ</button>
+    <button style="background: gold; color: black;" onclick="finish()">КТО ПОБЕДИЛ?</button>
+    <p id="info">Подключение...</p>
+
+    <script>
+        const TARGET_ID = 'medet_noise_battle_2026';
+        const peer = new Peer();
+        let conn;
+        let activeTable = 0;
+
+        peer.on('open', () => {
+            conn = peer.connect(TARGET_ID);
+            document.getElementById('info').innerText = "Связь с экраном ЕСТЬ";
+        });
+
+        function reset() { conn.send({reset: true}); activeTable = 0; }
+        function finish() { conn.send({finish: true}); activeTable = 0; }
+
+        async function startTest(tableNum) {
+            activeTable = tableNum;
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const audioContext = new AudioContext();
+            const analyser = audioContext.createAnalyser();
+            const microphone = audioContext.createMediaStreamSource(stream);
+            microphone.connect(analyser);
+            analyser.fftSize = 256;
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            const checkVolume = () => {
+                if (activeTable !== tableNum) return;
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for(let i=0; i<dataArray.length; i++) sum += dataArray[i];
+                let average = sum / dataArray.length;
+                let volume = Math.min(100, average * 1.5); // Коэффициент чувствительности
+                
+                conn.send({ table: tableNum, val: volume });
+                requestAnimationFrame(checkVolume);
+            };
+            checkVolume();
+            setTimeout(() => { activeTable = 0; }, 5000); // Тест идет 5 секунд
+        }
+    </script>
+</body>
+</html>
