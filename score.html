@@ -1,40 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="kk">
 <head>
     <meta charset="UTF-8">
-    <title>БИТВА ШУМА</title>
+    <title>MEDET SHOW: ДАУЫС БИТВАСЫ</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #000; color: #fff; font-family: 'Arial Black', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        
-        /* Исправленный текст победителя: теперь он ТОЧНО сверху всех слоев */
-        #winner-text { 
-            position: absolute; 
-            top: 10%; 
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 80px; 
-            color: gold; 
-            text-shadow: 0 0 40px rgba(255,215,0,0.8); 
-            display: none; 
-            text-transform: uppercase;
-            z-index: 9999; /* Самый высокий слой */
-            background: rgba(0,0,0,0.7); /* Подложка, чтобы текст не сливался */
-            padding: 20px 50px;
-            border-radius: 20px;
-            text-align: center;
+        body { 
+            background: #000; 
+            color: #fff; 
+            font-family: 'Arial Black', sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+            overflow: hidden; 
         }
 
-        .battle-container { display: flex; width: 90%; justify-content: space-around; align-items: flex-end; height: 60vh; z-index: 1; }
+        /* ПОБЕДИТЕЛЬ: Теперь СВЕРХУ (z-index) и в ЦЕНТРЕ */
+        #winner-text { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 90px; 
+            color: #FFD700; 
+            text-shadow: 0 0 50px rgba(255, 215, 0, 0.9); 
+            display: none; 
+            text-transform: uppercase;
+            z-index: 1000; 
+            background: rgba(0, 0, 0, 0.85); 
+            padding: 40px 80px;
+            border: 5px solid #FFD700;
+            border-radius: 30px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .battle-container { 
+            display: flex; 
+            width: 90%; 
+            justify-content: space-around; 
+            align-items: flex-end; 
+            height: 65vh; 
+            z-index: 1; 
+        }
+
         .table-bar { width: 35%; display: flex; flex-direction: column; align-items: center; }
-        .bar-outer { width: 100%; height: 400px; background: #111; border: 5px solid #333; position: relative; border-radius: 20px; overflow: hidden; }
-        .bar-inner { width: 100%; height: 0%; position: absolute; bottom: 0; transition: height 0.15s ease-out; }
         
-        #bar1 { background: linear-gradient(to top, #ff0055, #ff5588); box-shadow: 0 0 30px #ff0055; }
-        #bar2 { background: linear-gradient(to top, #007bff, #00d4ff); box-shadow: 0 0 30px #007bff; }
+        .bar-outer { 
+            width: 100%; 
+            height: 450px; 
+            background: #111; 
+            border: 6px solid #333; 
+            position: relative; 
+            border-radius: 25px; 
+            overflow: hidden; 
+            box-shadow: inset 0 0 20px #000;
+        }
+
+        .bar-inner { 
+            width: 100%; 
+            height: 0%; 
+            position: absolute; 
+            bottom: 0; 
+            transition: height 0.2s ease-out; 
+        }
         
-        .score { font-size: 70px; margin-top: 20px; font-weight: bold; }
-        .label { font-size: 25px; margin-bottom: 10px; color: #fff; text-shadow: 2px 2px 5px #000; }
+        #bar1 { background: linear-gradient(to top, #ff0055, #ff5588); box-shadow: 0 0 40px #ff0055; }
+        #bar2 { background: linear-gradient(to top, #007bff, #00d4ff); box-shadow: 0 0 40px #007bff; }
+        
+        .score { font-size: 100px; margin-top: 20px; font-weight: bold; font-family: monospace; }
+        .label { font-size: 40px; margin-bottom: 15px; color: #fff; text-shadow: 2px 2px 10px #000; }
     </style>
 </head>
 <body>
@@ -72,25 +110,4 @@
                 if (data.table === 1) {
                     if (data.val > s1) s1 = Math.floor(data.val);
                     document.getElementById('bar1').style.height = s1 + '%';
-                    document.getElementById('score1').innerText = s1;
-                }
-                if (data.table === 2) {
-                    if (data.val > s2) s2 = Math.floor(data.val);
-                    document.getElementById('bar2').style.height = s2 + '%';
-                    document.getElementById('score2').innerText = s2;
-                }
-
-                if (data.finish) {
-                    const winText = document.getElementById('winner-text');
-                    winText.style.display = 'block';
-                    if (s1 === s2) {
-                        winText.innerText = "ДОСТЫҚ ЖЕҢДІ!";
-                    } else {
-                        winText.innerText = s1 > s2 ? "1 СТОЛ ЖЕҢІМПАЗ!" : "2 СТОЛ ЖЕҢІМПАЗ!";
-                    }
-                }
-            });
-        });
-    </script>
-</body>
-</html>
+                    document.getElementById('score1').innerText = s
