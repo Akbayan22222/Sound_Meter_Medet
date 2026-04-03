@@ -2,103 +2,124 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>POSE RUN - MEDET SHOP</title>
+    <title>CYBER POSE RUN - MEDET SHOP</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; }
-        /* Камера толық экранда фон болып тұрады */
-        #video { position: absolute; width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
-        canvas { position: absolute; width: 100vw; height: 100vh; z-index: 10; transform: scaleX(-1); }
-        
-        /* Жақындап келе жатқан фигура */
-        #wall { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.1);
-            z-index: 5; opacity: 0; transition: all 0.1s linear;
-        }
-
-        #ui { position: absolute; top: 20px; left: 20px; z-index: 100; color: white; text-shadow: 2px 2px 10px #000; }
-        #timer { font-size: 80px; color: #ff0055; }
-        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; color: #00ffcc; z-index: 110; display: none; text-shadow: 0 0 20px #000; }
+        body { margin: 0; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        canvas { display: block; }
+        #timer { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 100px; color: #ff0055; font-family: 'Arial Black', sans-serif; z-index: 100; text-shadow: 0 0 20px #000; }
+        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 150px; color: #00ffcc; font-family: 'Arial Black', sans-serif; z-index: 110; display: none; text-shadow: 0 0 40px #00ffcc; }
     </style>
 </head>
 <body>
-
-    <video id="video" playsinline muted></video>
-    <canvas id="canvas"></canvas>
-    
-    <img id="wall" src="pose1.png">
-
-    <div id="ui">
-        <div id="timer">40</div>
-        <div style="font-size: 24px;">ПОВТОРИТЕ ПОЗУ!</div>
-    </div>
-
-    <div id="msg">PASS!</div>
+    <div id="timer">40</div>
+    <div id="msg">CHECK!</div>
 
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const wall = document.getElementById('wall');
-        const timerEl = document.getElementById('timer');
-        const msg = document.getElementById('msg');
+        const ADMIN_ID = 'medet_yoga_master_2026';
+        let video, detector, poses = [], wallImg;
+        let currentPoseNum = 1, wallScale = 0.05, wallOpacity = 0, timeLeft = 40;
+        let isGameRunning = false;
 
-        let currentPose = 1;
-        let timeLeft = 40;
-        let wallScale = 0.1;
-        let wallOpacity = 0;
-
-        async function init() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-            await video.play();
-            
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-
-            startWallAnimation();
-            startTimer();
+        function preload() {
+            // Сенің жаңа суреттерің (pose1.png, pose2.png...)
+            wallImg = loadImage(`pose1.png`); 
         }
 
-        // Фигураның жақындау анимациясы
-        function startWallAnimation() {
-            wallScale = 0.1;
-            wallOpacity = 0;
-            wall.src = `pose${currentPose}.png`; // pose1.png, pose2.png...
+        async function setup() {
+            createCanvas(windowWidth, windowHeight);
+            video = createCapture(VIDEO);
+            video.size(640, 480);
+            video.hide();
 
-            const interval = setInterval(() => {
-                wallScale += 0.02; // Жақындау жылдамдығы
-                wallOpacity += 0.05;
-                wall.style.transform = `translate(-50%, -50%) scale(${wallScale})`;
-                wall.style.opacity = wallOpacity;
+            // AI Детекторды қосу
+            const model = poseDetection.SupportedModels.BlazePose;
+            detector = await poseDetection.createDetector(model, { runtime: 'tfjs', modelType: 'full' });
 
-                if (wallScale >= 2.5) { // Фигура экраннан өтіп кетті
-                    clearInterval(interval);
-                    showFlash();
-                    currentPose = currentPose < 3 ? currentPose + 1 : 1; // Келесі фигура
-                    setTimeout(startWallAnimation, 1000);
-                }
-            }, 50);
-        }
+            // Админмен байланыс (Ескі логика сақталды)
+            const peer = new Peer();
+            peer.on('open', () => {
+                const conn = peer.connect(ADMIN_ID);
+                conn.on('data', (data) => {
+                    if (data.type === 'CHANGE_POSE' || data === 'NEXT') nextRound();
+                    if (data.type === 'CHECK') showFlash();
+                    isGameRunning = true; // Сигнал келгенде ойын басталады
+                });
+            });
 
-        function showFlash() {
-            msg.style.display = 'block';
-            msg.innerText = "CHECK!";
-            setTimeout(() => msg.style.display = 'none', 1000);
-        }
-
-        function startTimer() {
-            const t = setInterval(() => {
-                timeLeft--;
-                timerEl.innerText = timeLeft;
-                if (timeLeft <= 0) {
-                    timeLeft = 40; // Келесі раунд
+            setInterval(() => {
+                if (isGameRunning && timeLeft > 0) {
+                    timeLeft--;
+                    document.getElementById('timer').innerText = timeLeft;
+                    if (timeLeft === 0) timeLeft = 40;
                 }
             }, 1000);
         }
 
-        init();
+        async function draw() {
+            background(0); // Фон қара (жасыл силуэт жақсы көріну үшін)
+            
+            if (detector) {
+                const detectedPoses = await detector.estimatePoses(video.elt);
+                if (detectedPoses.length > 0) {
+                    drawGreenGhost(detectedPoses[0].keypoints);
+                }
+            }
+
+            if (isGameRunning) {
+                drawWall();
+            }
+        }
+
+        function drawGreenGhost(keypoints) {
+            push();
+            translate(width, 0); scale(-1, 1); // Айна эффектісі
+            stroke(0, 255, 100); strokeWeight(15); noFill();
+            drawingContext.shadowBlur = 30; drawingContext.shadowColor = 'rgb(0, 255, 100)';
+            
+            const pairs = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.BlazePose);
+            pairs.forEach(([i, j]) => {
+                const kp1 = keypoints[i], kp2 = keypoints[j];
+                if (kp1.score > 0.5 && kp2.score > 0.5) {
+                    line(map(kp1.x, 0, 640, 0, width), map(kp1.y, 0, 480, 0, height),
+                         map(kp2.x, 0, 640, 0, width), map(kp2.y, 0, 480, 0, height));
+                }
+            });
+            pop();
+        }
+
+        function drawWall() {
+            push();
+            translate(width / 2, height / 2); imageMode(CENTER);
+            tint(255, wallOpacity);
+            image(wallImg, 0, 0, wallImg.width * wallScale, wallImg.height * wallScale);
+            pop();
+
+            wallScale += 0.035; // Қабырғаның жақындау жылдамдығы
+            wallOpacity += 10;
+
+            if (wallScale > 5) {
+                showFlash();
+                nextRound();
+            }
+        }
+
+        function nextRound() {
+            wallScale = 0.05; wallOpacity = 0;
+            currentPoseNum = (currentPoseNum % 3) + 1;
+            wallImg = loadImage(`pose${currentPoseNum}.png`);
+        }
+
+        function showFlash() {
+            const msg = document.getElementById('msg');
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 1000);
+        }
+
+        function windowResized() { resizeCanvas(windowWidth, windowHeight); }
     </script>
 </body>
 </html>
