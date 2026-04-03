@@ -1,144 +1,38 @@
-# yoga_admin.html
-
-```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Yoga Control Pro</title>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      gap: 14px;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-
-    h1 {
-      margin: 0 0 20px 0;
-      font-size: 38px;
-    }
-
-    .panel {
-      width: min(92vw, 700px);
-      display: grid;
-      gap: 14px;
-    }
-
-    button {
-      width: 100%;
-      height: 90px;
-      border-radius: 22px;
-      border: none;
-      font-size: 28px;
-      font-weight: 800;
-      cursor: pointer;
-      text-transform: uppercase;
-    }
-
-    .start { background: #28a745; color: white; box-shadow: 0 0 25px rgba(40,167,69,0.5); }
-    .next  { background: #007bff; color: white; }
-    .stop  { background: #ff3b30; color: white; }
-    .pose1 { background: #6f42c1; color: white; }
-    .pose2 { background: #e83e8c; color: white; }
-    .pose3 { background: #fd7e14; color: white; }
-
-    #clients, #log {
-      width: min(92vw, 700px);
-      padding: 14px 18px;
-      border-radius: 16px;
-      background: rgba(255,255,255,0.08);
-      box-sizing: border-box;
-    }
-
-    #log {
-      min-height: 58px;
-      font-size: 20px;
-      color: #cfd8dc;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>MEDET YOGA ADMIN</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #111; color: white; font-family: sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        button { width: 85%; height: 110px; margin: 15px; border-radius: 25px; border: none; font-size: 26px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .start { background: #28a745; color: white; box-shadow: 0 0 20px rgba(40, 167, 69, 0.5); }
+        .next { background: #007bff; color: white; }
+        .stop { background: #ff3b30; color: white; }
+    </style>
 </head>
 <body>
-  <h1>MEDET CONTROL</h1>
+    <h1>MEDET CONTROL</h1>
+    <button class="start" onclick="send('START')">СТАРТ ИГРЫ</button>
+    <button class="next" onclick="send('NEXT')">СЛЕДУЮЩАЯ ПОЗА</button>
+    <button class="stop" onclick="send('STOP')">ПАУЗА / СТОП</button>
 
-  <div id="clients">Подключено экранов: 0</div>
+    <script>
+        const ADMIN_ID = 'medet_yoga_master_2026';
+        const peer = new Peer(ADMIN_ID);
+        let connections = [];
 
-  <div class="panel">
-    <button class="start" onclick="sendCommand('START')">СТАРТ ИГРЫ</button>
-    <button class="next" onclick="sendCommand('NEXT')">СЛЕДУЮЩАЯ ПОЗА</button>
-    <button class="stop" onclick="sendCommand('STOP')">ПАУЗА</button>
-    <button class="pose1" onclick="setPose(1)">ПОКАЗАТЬ POSE 1</button>
-    <button class="pose2" onclick="setPose(2)">ПОКАЗАТЬ POSE 2</button>
-    <button class="pose3" onclick="setPose(3)">ПОКАЗАТЬ POSE 3</button>
-  </div>
+        peer.on('connection', (conn) => {
+            connections.push(conn);
+            alert("Экран подключен!");
+        });
 
-  <div id="log">Ожидание подключения...</div>
-
-  <script>
-    const ADMIN_ID = 'medet_yoga_master_2026';
-    const peer = new Peer(ADMIN_ID);
-    const connections = [];
-
-    peer.on('open', () => {
-      log('Админ-панель запущена');
-    });
-
-    peer.on('connection', (conn) => {
-      conn.on('open', () => {
-        connections.push(conn);
-        updateClients();
-        log('Экран подключен');
-      });
-
-      conn.on('close', () => {
-        const index = connections.indexOf(conn);
-        if (index !== -1) connections.splice(index, 1);
-        updateClients();
-        log('Экран отключился');
-      });
-
-      conn.on('error', () => {
-        log('Ошибка соединения с экраном');
-      });
-    });
-
-    peer.on('error', (err) => {
-      log('PeerJS ошибка: ' + err.type);
-    });
-
-    function sendCommand(cmd) {
-      connections.forEach(c => {
-        if (c.open) c.send(cmd);
-      });
-      log('Отправлена команда: ' + cmd);
-    }
-
-    function setPose(num) {
-      connections.forEach(c => {
-        if (c.open) c.send({ cmd: 'SET_POSE', pose: num });
-      });
-      log('Установлена поза: pose' + num);
-    }
-
-    function updateClients() {
-      document.getElementById('clients').textContent = `Подключено экранов: ${connections.length}`;
-    }
-
-    function log(text) {
-      document.getElementById('log').textContent = text;
-    }
-  </script>
+        function send(cmd) {
+            connections.forEach(c => {
+                if (c.open) c.send(cmd);
+            });
+        }
+    </script>
 </body>
 </html>
-```
