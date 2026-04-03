@@ -2,120 +2,100 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>CYBER YOGA - MEDET SHOP</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <title>POSE RUN - MEDET SHOP</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: 'Arial Black', sans-serif; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        canvas { position: absolute; top: 0; left: 0; z-index: 10; width: 100vw; height: 100vh; object-fit: cover; }
-        video { position: absolute; opacity: 0; pointer-events: none; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; }
+        /* Камера толық экранда фон болып тұрады */
+        #video { position: absolute; width: 100vw; height: 100vh; object-fit: cover; transform: scaleX(-1); }
+        canvas { position: absolute; width: 100vw; height: 100vh; z-index: 10; transform: scaleX(-1); }
         
-        #ui { position: absolute; top: 20px; left: 20px; z-index: 100; background: rgba(255,0,85,0.7); padding: 15px; border-radius: 15px; border: 2px solid #fff; }
-        #taskImg { position: absolute; top: 20px; right: 20px; width: 250px; height: auto; border: 4px solid #00ffcc; border-radius: 15px; z-index: 100; background: #111; }
-        #result { position: absolute; bottom: 50px; font-size: 80px; text-transform: uppercase; z-index: 100; text-shadow: 0 0 20px #000; display: none; }
+        /* Жақындап келе жатқан фигура */
+        #wall { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.1);
+            z-index: 5; opacity: 0; transition: all 0.1s linear;
+        }
+
+        #ui { position: absolute; top: 20px; left: 20px; z-index: 100; color: white; text-shadow: 2px 2px 10px #000; }
+        #timer { font-size: 80px; color: #ff0055; }
+        #msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; color: #00ffcc; z-index: 110; display: none; text-shadow: 0 0 20px #000; }
     </style>
 </head>
 <body>
 
+    <video id="video" playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    
+    <img id="wall" src="pose1.png">
+
     <div id="ui">
-        <div id="status">ЗАГРУЗКА AI...</div>
-        <div id="score" style="font-size: 24px;">СЧЕТ: 0</div>
+        <div id="timer">40</div>
+        <div style="font-size: 24px;">ПОВТОРИТЕ ПОЗУ!</div>
     </div>
 
-    <img id="taskImg" src="pose1.png" alt="ПОЗА">
-
-    <div id="result">ОТЛИЧНО!</div>
-
-    <video id="video" playsinline muted></video>
-    <canvas id="output"></canvas>
+    <div id="msg">PASS!</div>
 
     <script>
-        const ADMIN_ID = 'medet_yoga_master_2026';
-        let detector;
-        let video = document.getElementById('video');
-        let canvas = document.getElementById('output');
-        let ctx = canvas.getContext('2d');
-        let peer = new Peer();
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const wall = document.getElementById('wall');
+        const timerEl = document.getElementById('timer');
+        const msg = document.getElementById('msg');
+
+        let currentPose = 1;
+        let timeLeft = 40;
+        let wallScale = 0.1;
+        let wallOpacity = 0;
 
         async function init() {
-            // Камераны баптау
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
             await video.play();
-
+            
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
 
-            // AI жүктеу
-            const model = poseDetection.SupportedModels.BlazePose;
-            detector = await poseDetection.createDetector(model, { runtime: 'tfjs', modelType: 'full' });
-            
-            document.getElementById('status').innerText = "ГОТОВ К ШОУ";
-            render();
-            
-            // Админмен байланыс
-            const conn = peer.connect(ADMIN_ID);
-            conn.on('data', (data) => {
-                if (data.type === 'CHANGE_POSE') {
-                    document.getElementById('taskImg').src = data.pose + '.png';
-                }
-                if (data.type === 'CHECK') {
-                    checkPose();
-                }
-            });
+            startWallAnimation();
+            startTimer();
         }
 
-        async function render() {
-            const poses = await detector.estimatePoses(video);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            if (poses.length > 0) {
-                drawSkeleton(poses[0].keypoints);
-            }
-            requestAnimationFrame(render);
-        }
+        // Фигураның жақындау анимациясы
+        function startWallAnimation() {
+            wallScale = 0.1;
+            wallOpacity = 0;
+            wall.src = `pose${currentPose}.png`; // pose1.png, pose2.png...
 
-        function drawSkeleton(keypoints) {
-            ctx.strokeStyle = '#00ffcc';
-            ctx.lineWidth = 8;
-            ctx.lineCap = 'round';
+            const interval = setInterval(() => {
+                wallScale += 0.02; // Жақындау жылдамдығы
+                wallOpacity += 0.05;
+                wall.style.transform = `translate(-50%, -50%) scale(${wallScale})`;
+                wall.style.opacity = wallOpacity;
 
-            const adjacentPairs = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.BlazePose);
-            adjacentPairs.forEach(([i, j]) => {
-                const kp1 = keypoints[i];
-                const kp2 = keypoints[j];
-                if (kp1.score > 0.5 && kp2.score > 0.5) {
-                    // Координаттарды экран өлшеміне шақтау
-                    const x1 = (kp1.x / video.videoWidth) * canvas.width;
-                    const y1 = (kp1.y / video.videoHeight) * canvas.height;
-                    const x2 = (kp2.x / video.videoWidth) * canvas.width;
-                    const y2 = (kp2.y / video.videoHeight) * canvas.height;
-                    
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.stroke();
+                if (wallScale >= 2.5) { // Фигура экраннан өтіп кетті
+                    clearInterval(interval);
+                    showFlash();
+                    currentPose = currentPose < 3 ? currentPose + 1 : 1; // Келесі фигура
+                    setTimeout(startWallAnimation, 1000);
                 }
-            });
+            }, 50);
         }
 
-        function checkPose() {
-            const resultDiv = document.getElementById('result');
-            resultDiv.style.display = 'block';
-            resultDiv.innerText = "ПРОВЕРКА...";
-            resultDiv.style.color = "#ffcc00";
+        function showFlash() {
+            msg.style.display = 'block';
+            msg.innerText = "CHECK!";
+            setTimeout(() => msg.style.display = 'none', 1000);
+        }
 
-            setTimeout(() => {
-                // Бұл жерде нағыз AI талдау алгоритмі болады
-                // Қазірше демонстрация үшін "ЖАҚСЫ" деп шығарамыз
-                resultDiv.innerText = "ВЕЛИКОЛЕПНО!";
-                resultDiv.style.color = "#00ffcc";
-                setTimeout(() => resultDiv.style.display = 'none', 3000);
-            }, 2000);
+        function startTimer() {
+            const t = setInterval(() => {
+                timeLeft--;
+                timerEl.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    timeLeft = 40; // Келесі раунд
+                }
+            }, 1000);
         }
 
         init();
