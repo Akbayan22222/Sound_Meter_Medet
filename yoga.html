@@ -1,179 +1,132 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MEDET AI POSE WALL - PRO</title>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
-  <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; }
-    canvas { display: block; }
-    #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-    #timer { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 80px; font-weight: 900; color: #ff0055; text-shadow: 0 0 20px rgba(0,0,0,0.8); }
-    #score { position: absolute; top: 28px; left: 28px; font-size: 34px; color: #fff; text-shadow: 0 0 12px #000; }
-    #status { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); font-size: 22px; color: #00ffcc; background: rgba(0,0,0,0.6); padding: 10px 25px; border-radius: 50px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>CYBER WALL RUN - MASTER</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; font-family: 'Arial Black', sans-serif; }
+        #timer { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 90px; color: #ff0055; z-index: 100; }
+        #status-msg { position: absolute; bottom: 30px; color: #00ffcc; font-size: 20px; z-index: 100; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 50px; }
+    </style>
 </head>
 <body>
-  <div id="hud">
     <div id="timer">10</div>
-    <div id="score">Счёт: 0</div>
-    <div id="status">ОЖИДАНИЕ АДМИНА...</div>
-  </div>
+    <div id="status-msg">ИЩУ ПАНЕЛЬ УПРАВЛЕНИЯ...</div>
 
-  <script>
-    const ADMIN_ID = 'medet_yoga_master_2026';
-    const ROUND_TIME = 10;
-    const WALL_SPEED = 0.026; // Сәл жылдамдатылды
-    const SUCCESS_THRESHOLD = 0.58; // Өту жеңілдетілді (58%)
+    <script>
+        const ADMIN_ID = 'medet_yoga_2026_pro'; // Жаңа бірегей ID
+        let video, detector, poses = [], wallImg;
+        let currentPoseNum = 1, wallScale = 0.12, wallOpacity = 50; 
+        let isMoving = false, timeLeft = 10;
+        let peer, conn;
 
-    let video, detector, peer, conn;
-    let poseImages = {};
-    let currentPoseNum = 1;
-    let gameStarted = false;
-    let wallScale = 0.12;
-    let timerValue = ROUND_TIME;
-    let timerInterval = null;
-    let score = 0;
-    let lastPose = null;
-    let roundChecked = false;
+        function preload() {
+            wallImg = loadImage(`pose1.png`);
+        }
 
-    // Скелет координаталары (Reference)
-    const referencePoses = {
-      pose1: { joints: { leftShoulder: [0.39, 0.32], rightShoulder: [0.61, 0.32], leftElbow: [0.33, 0.20], rightElbow: [0.67, 0.20], leftWrist: [0.31, 0.08], rightWrist: [0.69, 0.08], leftHip: [0.43, 0.55], rightHip: [0.57, 0.55], leftKnee: [0.33, 0.73], rightKnee: [0.67, 0.73], leftAnkle: [0.26, 0.92], rightAnkle: [0.74, 0.92] } },
-      pose2: { joints: { leftShoulder: [0.35, 0.42], rightShoulder: [0.65, 0.42], leftElbow: [0.46, 0.47], rightElbow: [0.54, 0.47], leftWrist: [0.50, 0.48], rightWrist: [0.50, 0.48], leftHip: [0.43, 0.60], rightHip: [0.57, 0.60], leftKnee: [0.46, 0.80], rightKnee: [0.54, 0.80], leftAnkle: [0.42, 0.95], rightAnkle: [0.58, 0.95] } },
-      pose3: { joints: { leftShoulder: [0.38, 0.42], rightShoulder: [0.62, 0.42], leftElbow: [0.27, 0.43], rightElbow: [0.73, 0.43], leftWrist: [0.18, 0.43], rightWrist: [0.82, 0.43], leftHip: [0.42, 0.58], rightHip: [0.58, 0.58], leftKnee: [0.42, 0.80], rightKnee: [0.58, 0.80], leftAnkle: [0.42, 0.95], rightAnkle: [0.58, 0.95] } }
-    };
+        async function setup() {
+            createCanvas(windowWidth, windowHeight);
+            video = createCapture(VIDEO);
+            video.size(640, 480);
+            video.hide();
 
-    function preload() {
-      poseImages.pose1 = loadImage('pose1.png');
-      poseImages.pose2 = loadImage('pose2.png');
-      poseImages.pose3 = loadImage('pose3.png');
-    }
+            const model = poseDetection.SupportedModels.BlazePose;
+            detector = await poseDetection.createDetector(model, { runtime: 'tfjs', modelType: 'full' });
 
-    async function setup() {
-      createCanvas(windowWidth, windowHeight);
-      video = createCapture({ video: { facingMode: 'user' }, audio: false });
-      video.size(640, 480);
-      video.hide();
+            initPeer();
 
-      detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'tfjs', modelType: 'full' });
-      connectAdmin();
-    }
+            setInterval(() => {
+                if (isMoving && timeLeft > 0) {
+                    timeLeft--;
+                    document.getElementById('timer').innerText = timeLeft;
+                    if (timeLeft === 0) timeLeft = 10;
+                }
+            }, 1000);
+        }
 
-    function connectAdmin() {
-      peer = new Peer();
-      peer.on('open', () => {
-        conn = peer.connect(ADMIN_ID);
-        conn.on('data', handleAdminCommand);
-      });
-    }
+        function initPeer() {
+            peer = new Peer();
+            peer.on('open', () => {
+                tryConnect();
+            });
+        }
 
-    function handleAdminCommand(data) {
-      if (data === 'START') startGame();
-      if (data === 'STOP') gameStarted = false;
-      if (data === 'NEXT') finishRoundAndNext();
-    }
+        function tryConnect() {
+            if (conn) conn.close();
+            conn = peer.connect(ADMIN_ID);
+            
+            conn.on('open', () => {
+                document.getElementById('status-msg').innerText = "ПОДКЛЮЧЕНО! ЖДУ СТАРТ...";
+            });
 
-    function draw() {
-      background(0);
-      drawCorridor();
+            conn.on('data', (data) => {
+                if (data === 'START') {
+                    isMoving = true;
+                    document.getElementById('status-msg').style.display = 'none';
+                }
+                if (data === 'STOP') isMoving = false;
+                if (data === 'NEXT') nextRound();
+            });
 
-      if (detector) {
-        detector.estimatePoses(video.elt, { flipHorizontal: true }).then(poses => {
-          if (poses && poses.length > 0) {
-            lastPose = poses[0];
-            drawGreenSilhouette(lastPose.keypoints);
-          }
-        });
-      }
+            conn.on('close', () => {
+                document.getElementById('status-msg').style.display = 'block';
+                document.getElementById('status-msg').innerText = "СВЯЗЬ ПОТЕРЯНА. ПЕРЕПОДКЛЮЧЕНИЕ...";
+                setTimeout(tryConnect, 3000);
+            });
+        }
 
-      drawWall();
-    }
+        async function draw() {
+            background(0);
+            if (detector) {
+                const detectedPoses = await detector.estimatePoses(video.elt);
+                if (detectedPoses.length > 0) drawGreenGhost(detectedPoses[0].keypoints);
+            }
+            drawWall();
+        }
 
-    function drawCorridor() {
-      push();
-      noFill();
-      strokeWeight(2);
-      for (let i = 0; i < 5; i++) {
-        let alpha = map(i, 0, 5, 100, 20);
-        stroke(0, 255, 255, alpha);
-        let w = width - (i * 150);
-        let h = height - (i * 100);
-        rect(width/2, height/2, w, h);
-      }
-      pop();
-    }
+        function drawGreenGhost(keypoints) {
+            push();
+            translate(width, 0); scale(-1, 1);
+            stroke(0, 255, 100); strokeWeight(18); noFill();
+            drawingContext.shadowBlur = 45; drawingContext.shadowColor = 'rgb(0, 255, 100)';
+            const pairs = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.BlazePose);
+            pairs.forEach(([i, j]) => {
+                const kp1 = keypoints[i], kp2 = keypoints[j];
+                if (kp1.score > 0.45 && kp2.score > 0.45) {
+                    line(map(kp1.x, 0, 640, 0, width), map(kp1.y, 0, 480, 0, height),
+                         map(kp2.x, 0, 640, 0, width), map(kp2.y, 0, 480, 0, height));
+                }
+            });
+            pop();
+        }
 
-    function drawGreenSilhouette(keypoints) {
-      push();
-      stroke(0, 255, 100);
-      strokeWeight(18); // Қалың силуэт
-      noFill();
-      drawingContext.shadowBlur = 45; // Күшті жарқырау
-      drawingContext.shadowColor = 'rgba(0, 255, 100, 1)';
+        function drawWall() {
+            push();
+            translate(width / 2, height / 2);
+            imageMode(CENTER);
+            let currentOpacity = isMoving ? wallOpacity : 100;
+            tint(255, currentOpacity);
+            image(wallImg, 0, 0, wallImg.width * wallScale, wallImg.height * wallScale);
+            pop();
 
-      const skeletonPairs = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.BlazePose);
-      const kpMap = {};
-      keypoints.forEach(kp => { if (kp.score > 0.4) kpMap[kp.name] = { x: map(kp.x, 0, 640, 0, width), y: map(kp.y, 0, 480, 0, height) }; });
+            if (isMoving) {
+                wallScale += 0.028;
+                wallOpacity += 10;
+                if (wallScale > 4.5) nextRound();
+            }
+        }
 
-      skeletonPairs.forEach(([i, j]) => {
-        const a = keypoints[i], b = keypoints[j];
-        if (kpMap[a.name] && kpMap[b.name]) line(kpMap[a.name].x, kpMap[a.name].y, kpMap[b.name].x, kpMap[b.name].y);
-      });
-      pop();
-    }
+        function nextRound() {
+            wallScale = 0.12; wallOpacity = 50;
+            currentPoseNum = (currentPoseNum % 3) + 1;
+            wallImg = loadImage(`pose${currentPoseNum}.png`);
+        }
 
-    function drawWall() {
-      if (!gameStarted) return;
-      const img = poseImages[`pose${currentPoseNum}`];
-      if (!img) return;
-
-      push();
-      imageMode(CENTER);
-      let sz = min(width, height) * wallScale;
-      image(img, width/2, height/2, sz, sz);
-      pop();
-
-      wallScale += WALL_SPEED;
-
-      if (!roundChecked && wallScale >= 0.95) {
-        roundChecked = true;
-        checkPose();
-      }
-
-      if (wallScale >= 1.3) finishRoundAndNext();
-    }
-
-    function checkPose() {
-      // Бұл жерде ұқсастықты тексеру логикасы (SUCCESS_THRESHOLD қолданылады)
-      score++; 
-      document.getElementById('score').innerText = `Счёт: ${score}`;
-      document.getElementById('status').innerText = "ОТЛИЧНО!";
-      setTimeout(() => document.getElementById('status').innerText = "", 1000);
-    }
-
-    function startGame() {
-        gameStarted = true;
-        wallScale = 0.12;
-        roundChecked = false;
-        timeLeft = ROUND_TIME;
-    }
-
-    function finishRoundAndNext() {
-      wallScale = 0.12;
-      roundChecked = false;
-      currentPoseNum = currentPoseNum >= 3 ? 1 : currentPoseNum + 1;
-    }
-
-    function windowResized() { resizeCanvas(windowWidth, windowHeight); }
-  </script>
+        function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+    </script>
 </body>
 </html>
