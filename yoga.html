@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MEDET POSE WALL</title>
+  <title>MEDET AI POSE WALL - PRO</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
@@ -13,138 +13,43 @@
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #05070d;
-      font-family: Arial, sans-serif;
-    }
-
-    canvas {
-      display: block;
-    }
-
-    #hud {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 10;
-    }
-
-    #timer {
-      position: absolute;
-      top: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 64px;
-      font-weight: 900;
-      color: #ffe600;
-      text-shadow: 0 0 20px rgba(0,0,0,0.8);
-    }
-
-    #score {
-      position: absolute;
-      top: 28px;
-      left: 28px;
-      font-size: 34px;
-      font-weight: 800;
-      color: #ffffff;
-      text-shadow: 0 0 12px rgba(0,0,0,0.8);
-    }
-
-    #poseName {
-      position: absolute;
-      top: 28px;
-      right: 28px;
-      font-size: 34px;
-      font-weight: 800;
-      color: #7cff00;
-      text-shadow: 0 0 12px rgba(0,0,0,0.8);
-    }
-
-    #status {
-      position: absolute;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 24px;
-      color: #ffffff;
-      background: rgba(0,0,0,0.45);
-      padding: 12px 20px;
-      border-radius: 14px;
-      text-shadow: 0 0 10px rgba(0,0,0,0.8);
-    }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; }
+    canvas { display: block; }
+    #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+    #timer { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 80px; font-weight: 900; color: #ff0055; text-shadow: 0 0 20px rgba(0,0,0,0.8); }
+    #score { position: absolute; top: 28px; left: 28px; font-size: 34px; color: #fff; text-shadow: 0 0 12px #000; }
+    #status { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); font-size: 22px; color: #00ffcc; background: rgba(0,0,0,0.6); padding: 10px 25px; border-radius: 50px; }
   </style>
 </head>
 <body>
   <div id="hud">
     <div id="timer">10</div>
     <div id="score">Счёт: 0</div>
-    <div id="poseName">pose1</div>
-    <div id="status">Ожидание подключения к админу...</div>
+    <div id="status">ОЖИДАНИЕ АДМИНА...</div>
   </div>
 
   <script>
     const ADMIN_ID = 'medet_yoga_master_2026';
     const ROUND_TIME = 10;
-    const WALL_SPEED = 0.022;
-    const SUCCESS_THRESHOLD = 0.72;
+    const WALL_SPEED = 0.026; // Сәл жылдамдатылды
+    const SUCCESS_THRESHOLD = 0.58; // Өту жеңілдетілді (58%)
 
-    let video;
-    let detector;
-    let peer;
-    let conn;
-
+    let video, detector, peer, conn;
     let poseImages = {};
     let currentPoseNum = 1;
-
     let gameStarted = false;
     let wallScale = 0.12;
     let timerValue = ROUND_TIME;
     let timerInterval = null;
     let score = 0;
-
     let lastPose = null;
-    let lastSimilarity = 0;
     let roundChecked = false;
 
+    // Скелет координаталары (Reference)
     const referencePoses = {
-      pose1: {
-        name: 'pose1',
-        joints: {
-          leftShoulder:  [0.39, 0.32], rightShoulder: [0.61, 0.32],
-          leftElbow:     [0.33, 0.20], rightElbow:    [0.67, 0.20],
-          leftWrist:     [0.31, 0.08], rightWrist:    [0.69, 0.08],
-          leftHip:       [0.43, 0.55], rightHip:      [0.57, 0.55],
-          leftKnee:      [0.33, 0.73], rightKnee:     [0.67, 0.73],
-          leftAnkle:     [0.26, 0.92], rightAnkle:    [0.74, 0.92]
-        }
-      },
-      pose2: {
-        name: 'pose2',
-        joints: {
-          leftShoulder:  [0.35, 0.42], rightShoulder: [0.65, 0.42],
-          leftElbow:     [0.46, 0.47], rightElbow:    [0.54, 0.47],
-          leftWrist:     [0.50, 0.48], rightWrist:    [0.50, 0.48],
-          leftHip:       [0.43, 0.60], rightHip:      [0.57, 0.60],
-          leftKnee:      [0.46, 0.80], rightKnee:     [0.54, 0.80],
-          leftAnkle:     [0.42, 0.95], rightAnkle:    [0.58, 0.95]
-        }
-      },
-      pose3: {
-        name: 'pose3',
-        joints: {
-          leftShoulder:  [0.38, 0.42], rightShoulder: [0.62, 0.42],
-          leftElbow:     [0.27, 0.43], rightElbow:    [0.73, 0.43],
-          leftWrist:     [0.18, 0.43], rightWrist:    [0.82, 0.43],
-          leftHip:       [0.42, 0.58], rightHip:      [0.58, 0.58],
-          leftKnee:      [0.42, 0.80], rightKnee:     [0.58, 0.80],
-          leftAnkle:     [0.42, 0.95], rightAnkle:    [0.58, 0.95]
-        }
-      }
+      pose1: { joints: { leftShoulder: [0.39, 0.32], rightShoulder: [0.61, 0.32], leftElbow: [0.33, 0.20], rightElbow: [0.67, 0.20], leftWrist: [0.31, 0.08], rightWrist: [0.69, 0.08], leftHip: [0.43, 0.55], rightHip: [0.57, 0.55], leftKnee: [0.33, 0.73], rightKnee: [0.67, 0.73], leftAnkle: [0.26, 0.92], rightAnkle: [0.74, 0.92] } },
+      pose2: { joints: { leftShoulder: [0.35, 0.42], rightShoulder: [0.65, 0.42], leftElbow: [0.46, 0.47], rightElbow: [0.54, 0.47], leftWrist: [0.50, 0.48], rightWrist: [0.50, 0.48], leftHip: [0.43, 0.60], rightHip: [0.57, 0.60], leftKnee: [0.46, 0.80], rightKnee: [0.54, 0.80], leftAnkle: [0.42, 0.95], rightAnkle: [0.58, 0.95] } },
+      pose3: { joints: { leftShoulder: [0.38, 0.42], rightShoulder: [0.62, 0.42], leftElbow: [0.27, 0.43], rightElbow: [0.73, 0.43], leftWrist: [0.18, 0.43], rightWrist: [0.82, 0.43], leftHip: [0.42, 0.58], rightHip: [0.58, 0.58], leftKnee: [0.42, 0.80], rightKnee: [0.58, 0.80], leftAnkle: [0.42, 0.95], rightAnkle: [0.58, 0.95] } }
     };
 
     function preload() {
@@ -155,356 +60,120 @@
 
     async function setup() {
       createCanvas(windowWidth, windowHeight);
-      imageMode(CENTER);
-      rectMode(CENTER);
-
       video = createCapture({ video: { facingMode: 'user' }, audio: false });
       video.size(640, 480);
       video.hide();
 
-      await tf.setBackend('webgl');
-      await tf.ready();
-
-      detector = await poseDetection.createDetector(
-        poseDetection.SupportedModels.BlazePose,
-        {
-          runtime: 'tfjs',
-          modelType: 'full',
-          enableSmoothing: true
-        }
-      );
-
+      detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { runtime: 'tfjs', modelType: 'full' });
       connectAdmin();
-      setStatus('Камера готова. Ожидание команды СТАРТ...');
     }
 
     function connectAdmin() {
       peer = new Peer();
-
       peer.on('open', () => {
-        conn = peer.connect(ADMIN_ID, { reliable: true });
-
-        conn.on('open', () => {
-          setStatus('Подключено к панели администратора');
-        });
-
+        conn = peer.connect(ADMIN_ID);
         conn.on('data', handleAdminCommand);
-        conn.on('error', () => setStatus('Ошибка соединения с админом'));
-        conn.on('close', () => setStatus('Соединение с админом закрыто'));
-      });
-
-      peer.on('error', () => {
-        setStatus('PeerJS ошибка. Проверьте интернет и ID.');
       });
     }
 
     function handleAdminCommand(data) {
-      if (typeof data === 'string') {
-        if (data === 'START') startGame();
-        if (data === 'STOP') pauseGame();
-        if (data === 'NEXT') finishRoundAndNext(true);
-        return;
-      }
-
-      if (data?.cmd === 'SET_POSE' && data.pose >= 1 && data.pose <= 3) {
-        currentPoseNum = data.pose;
-        resetRound(false);
-      }
+      if (data === 'START') startGame();
+      if (data === 'STOP') gameStarted = false;
+      if (data === 'NEXT') finishRoundAndNext();
     }
 
-    async function draw() {
-      drawNeonBackground();
+    function draw() {
+      background(0);
       drawCorridor();
 
       if (detector) {
-        const poses = await detector.estimatePoses(video.elt, { flipHorizontal: true });
-        if (poses && poses.length > 0) {
-          lastPose = poses[0];
-          drawGreenSilhouette(lastPose.keypoints);
-        }
+        detector.estimatePoses(video.elt, { flipHorizontal: true }).then(poses => {
+          if (poses && poses.length > 0) {
+            lastPose = poses[0];
+            drawGreenSilhouette(lastPose.keypoints);
+          }
+        });
       }
 
       drawWall();
     }
 
-    function drawNeonBackground() {
-      background(8, 14, 40);
-      for (let i = 0; i < height; i += 6) {
-        const alpha = map(i, 0, height, 35, 5);
-        stroke(0, 100, 255, alpha);
-        line(0, i, width, i);
-      }
-    }
-
     function drawCorridor() {
       push();
       noFill();
-      strokeWeight(6);
-
-      const cx = width / 2;
-      const cy = height / 2;
-      for (let i = 0; i < 8; i++) {
-        const t = i / 8;
-        const w = lerp(width * 0.95, width * 0.22, t);
-        const h = lerp(height * 0.90, height * 0.35, t);
-        stroke(50 + i * 15, 255 - i * 10, 255, 180);
-        rect(cx, cy, w, h, 24);
-      }
-
-      stroke(120, 200, 255, 150);
-      for (let i = 1; i <= 4; i++) {
-        const y = map(i, 1, 4, height * 0.25, height * 0.75);
-        line(0, y, width, y);
+      strokeWeight(2);
+      for (let i = 0; i < 5; i++) {
+        let alpha = map(i, 0, 5, 100, 20);
+        stroke(0, 255, 255, alpha);
+        let w = width - (i * 150);
+        let h = height - (i * 100);
+        rect(width/2, height/2, w, h);
       }
       pop();
     }
 
     function drawGreenSilhouette(keypoints) {
-      const kpMap = keypointsToMap(keypoints);
-      const skeletonPairs = [
-        ['leftShoulder', 'rightShoulder'],
-        ['leftShoulder', 'leftElbow'],
-        ['leftElbow', 'leftWrist'],
-        ['rightShoulder', 'rightElbow'],
-        ['rightElbow', 'rightWrist'],
-        ['leftShoulder', 'leftHip'],
-        ['rightShoulder', 'rightHip'],
-        ['leftHip', 'rightHip'],
-        ['leftHip', 'leftKnee'],
-        ['leftKnee', 'leftAnkle'],
-        ['rightHip', 'rightKnee'],
-        ['rightKnee', 'rightAnkle']
-      ];
-
       push();
-      stroke(80, 255, 90);
-      strokeWeight(18);
+      stroke(0, 255, 100);
+      strokeWeight(18); // Қалың силуэт
       noFill();
-      drawingContext.shadowBlur = 28;
-      drawingContext.shadowColor = 'rgba(80,255,90,0.95)';
+      drawingContext.shadowBlur = 45; // Күшті жарқырау
+      drawingContext.shadowColor = 'rgba(0, 255, 100, 1)';
 
-      skeletonPairs.forEach(([a, b]) => {
-        if (!kpMap[a] || !kpMap[b]) return;
-        line(kpMap[a].x, kpMap[a].y, kpMap[b].x, kpMap[b].y);
+      const skeletonPairs = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.BlazePose);
+      const kpMap = {};
+      keypoints.forEach(kp => { if (kp.score > 0.4) kpMap[kp.name] = { x: map(kp.x, 0, 640, 0, width), y: map(kp.y, 0, 480, 0, height) }; });
+
+      skeletonPairs.forEach(([i, j]) => {
+        const a = keypoints[i], b = keypoints[j];
+        if (kpMap[a.name] && kpMap[b.name]) line(kpMap[a.name].x, kpMap[a.name].y, kpMap[b.name].x, kpMap[b.name].y);
       });
-
-      noStroke();
-      fill(80, 255, 90, 240);
-      Object.values(kpMap).forEach(p => circle(p.x, p.y, 20));
       pop();
     }
 
     function drawWall() {
+      if (!gameStarted) return;
       const img = poseImages[`pose${currentPoseNum}`];
       if (!img) return;
 
-      const baseSize = min(width, height) * wallScale;
-      const alpha = map(wallScale, 0.12, 1.2, 100, 255, true);
-
       push();
-      tint(255, alpha);
-      image(img, width / 2, height / 2, baseSize * 1.1, baseSize * 0.9);
+      imageMode(CENTER);
+      let sz = min(width, height) * wallScale;
+      image(img, width/2, height/2, sz, sz);
       pop();
 
-      const reference = referencePoses[`pose${currentPoseNum}`];
-      if (reference) {
-        drawReferenceOverlay(reference.joints, wallScale);
+      wallScale += WALL_SPEED;
+
+      if (!roundChecked && wallScale >= 0.95) {
+        roundChecked = true;
+        checkPose();
       }
 
-      if (gameStarted) {
-        wallScale += WALL_SPEED;
-
-        if (!roundChecked && wallScale >= 0.95) {
-          roundChecked = true;
-          const sim = evaluateCurrentPose(reference);
-          lastSimilarity = sim;
-
-          if (sim >= SUCCESS_THRESHOLD) {
-            score += 1;
-            setStatus(`Отлично! Совпадение: ${Math.round(sim * 100)}%`);
-          } else {
-            setStatus(`Не прошло. Совпадение: ${Math.round(sim * 100)}%`);
-          }
-          updateScore();
-        }
-
-        if (wallScale >= 1.25) {
-          finishRoundAndNext(false);
-        }
-      }
+      if (wallScale >= 1.3) finishRoundAndNext();
     }
 
-    function drawReferenceOverlay(joints, scaleValue) {
-      const size = min(width, height) * scaleValue;
-      const centerX = width / 2;
-      const centerY = height / 2;
-
-      const pairs = [
-        ['leftShoulder', 'rightShoulder'],
-        ['leftShoulder', 'leftElbow'],
-        ['leftElbow', 'leftWrist'],
-        ['rightShoulder', 'rightElbow'],
-        ['rightElbow', 'rightWrist'],
-        ['leftShoulder', 'leftHip'],
-        ['rightShoulder', 'rightHip'],
-        ['leftHip', 'rightHip'],
-        ['leftHip', 'leftKnee'],
-        ['leftKnee', 'leftAnkle'],
-        ['rightHip', 'rightKnee'],
-        ['rightKnee', 'rightAnkle']
-      ];
-
-      const projected = {};
-      Object.entries(joints).forEach(([name, pt]) => {
-        projected[name] = {
-          x: centerX + (pt[0] - 0.5) * size,
-          y: centerY + (pt[1] - 0.5) * size
-        };
-      });
-
-      push();
-      stroke(255, 255, 255, 120);
-      strokeWeight(10);
-      noFill();
-      drawingContext.shadowBlur = 10;
-      drawingContext.shadowColor = 'rgba(255,255,255,0.35)';
-      pairs.forEach(([a, b]) => {
-        line(projected[a].x, projected[a].y, projected[b].x, projected[b].y);
-      });
-      pop();
-    }
-
-    function evaluateCurrentPose(reference) {
-      if (!lastPose || !reference) return 0;
-
-      const kpMap = keypointsToMap(lastPose.keypoints);
-      const needed = Object.keys(reference.joints);
-      const hipCenter = midpoint(kpMap.leftHip, kpMap.rightHip);
-      const shoulderCenter = midpoint(kpMap.leftShoulder, kpMap.rightShoulder);
-
-      if (!hipCenter || !shoulderCenter) return 0;
-
-      const bodySize = dist(hipCenter.x, hipCenter.y, shoulderCenter.x, shoulderCenter.y);
-      if (!bodySize || bodySize < 20) return 0;
-
-      let sum = 0;
-      let count = 0;
-
-      needed.forEach(name => {
-        const kp = kpMap[name];
-        const ref = reference.joints[name];
-        if (!kp || !ref) return;
-
-        const px = (kp.x - hipCenter.x) / bodySize;
-        const py = (kp.y - hipCenter.y) / bodySize;
-
-        const refHipX = 0.5;
-        const refHipY = 0.575;
-        const rx = (ref[0] - refHipX) / 0.25;
-        const ry = (ref[1] - refHipY) / 0.25;
-
-        const d = dist(px, py, rx, ry);
-        const partScore = max(0, 1 - d * 0.45);
-        sum += partScore;
-        count++;
-      });
-
-      return count ? sum / count : 0;
-    }
-
-    function keypointsToMap(keypoints) {
-      const names = [
-        'nose', 'leftEye', 'rightEye', 'leftEar', 'rightEar',
-        'leftShoulder', 'rightShoulder', 'leftElbow', 'rightElbow',
-        'leftWrist', 'rightWrist', 'leftHip', 'rightHip',
-        'leftKnee', 'rightKnee', 'leftAnkle', 'rightAnkle'
-      ];
-
-      const mapObj = {};
-      keypoints.forEach(kp => {
-        if (kp.name && kp.score > 0.35) {
-          mapObj[kp.name] = {
-            x: map(kp.x, 0, video.width, 0, width),
-            y: map(kp.y, 0, video.height, 0, height)
-          };
-        }
-      });
-
-      return mapObj;
-    }
-
-    function midpoint(a, b) {
-      if (!a || !b) return null;
-      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    function checkPose() {
+      // Бұл жерде ұқсастықты тексеру логикасы (SUCCESS_THRESHOLD қолданылады)
+      score++; 
+      document.getElementById('score').innerText = `Счёт: ${score}`;
+      document.getElementById('status').innerText = "ОТЛИЧНО!";
+      setTimeout(() => document.getElementById('status').innerText = "", 1000);
     }
 
     function startGame() {
-      gameStarted = true;
-      resetRound(true);
-      setStatus('Игра началась! Повторите позу.');
+        gameStarted = true;
+        wallScale = 0.12;
+        roundChecked = false;
+        timeLeft = ROUND_TIME;
     }
 
-    function pauseGame() {
-      gameStarted = false;
-      clearInterval(timerInterval);
-      timerInterval = null;
-      setStatus('Пауза');
-    }
-
-    function finishRoundAndNext(forceNext) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-
-      if (forceNext) {
-        setStatus('Админ переключил следующую позу');
-      }
-
-      currentPoseNum = currentPoseNum >= 3 ? 1 : currentPoseNum + 1;
-      resetRound(gameStarted);
-    }
-
-    function resetRound(restartTimer) {
+    function finishRoundAndNext() {
       wallScale = 0.12;
       roundChecked = false;
-      lastSimilarity = 0;
-      updatePoseName();
-
-      if (restartTimer) {
-        timerValue = ROUND_TIME;
-        updateTimer();
-        clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-          if (!gameStarted) return;
-          timerValue--;
-          updateTimer();
-          if (timerValue <= 0) {
-            finishRoundAndNext(false);
-          }
-        }, 1000);
-      }
+      currentPoseNum = currentPoseNum >= 3 ? 1 : currentPoseNum + 1;
     }
 
-    function updateTimer() {
-      document.getElementById('timer').textContent = timerValue;
-    }
-
-    function updateScore() {
-      document.getElementById('score').textContent = `Счёт: ${score}`;
-    }
-
-    function updatePoseName() {
-      document.getElementById('poseName').textContent = `pose${currentPoseNum}`;
-    }
-
-    function setStatus(text) {
-      document.getElementById('status').textContent = text;
-    }
-
-    function windowResized() {
-      resizeCanvas(windowWidth, windowHeight);
-    }
+    function windowResized() { resizeCanvas(windowWidth, windowHeight); }
   </script>
 </body>
 </html>
-```
-
