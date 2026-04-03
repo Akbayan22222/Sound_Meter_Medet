@@ -2,24 +2,19 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Yoga Admin</title>
+    <title>Yoga Admin Pro</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; }
-        .btn { width: 80%; height: 60px; margin: 10px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
-        .pose-btn { background: #007bff; color: white; }
-        .check-btn { background: #28a745; color: white; height: 100px; font-size: 24px; }
+        body { background: #111; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
+        button { width: 85%; height: 80px; margin: 15px; border-radius: 20px; border: none; font-size: 22px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .next { background: #007bff; color: white; }
+        .check { background: #28a745; color: white; height: 120px; }
     </style>
 </head>
 <body>
-    <h2>УПРАВЛЕНИЕ ЙОГА-ШОУ</h2>
-    
-    <button class="btn pose-btn" onclick="changePose('pose1')">ФИГУРА 1</button>
-    <button class="btn pose-btn" onclick="changePose('pose2')">ФИГУРА 2</button>
-    <button class="btn pose-btn" onclick="changePose('pose3')">ФИГУРА 3</button>
-    
-    <hr>
-    <button class="btn check-btn" onclick="check()">ФИКСИРОВАТЬ РЕЗУЛЬТАТ</button>
+    <h1>MEDET YOGA CONTROL</h1>
+    <button class="next" onclick="changePose()">СЛЕДУЮЩАЯ ФИГУРА</button>
+    <button class="check" onclick="check()">ФИКСИРОВАТЬ РЕЗУЛЬТАТ</button>
 
     <script>
         const ADMIN_ID = 'medet_yoga_master_2026';
@@ -28,14 +23,15 @@
 
         peer.on('connection', (conn) => {
             connections.push(conn);
+            alert("Экран подключен!");
         });
 
-        function changePose(name) {
-            connections.forEach(c => c.send({ type: 'CHANGE_POSE', pose: name }));
+        function changePose() {
+            connections.forEach(c => c.send('NEXT'));
         }
 
         function check() {
-            connections.forEach(c => c.send({ type: 'CHECK' }));
+            connections.forEach(c => c.send('CHECK'));
         }
     </script>
 </body>
