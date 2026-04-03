@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Yoga Admin</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; }
+        .btn { width: 80%; height: 60px; margin: 10px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
+        .pose-btn { background: #007bff; color: white; }
+        .check-btn { background: #28a745; color: white; height: 100px; font-size: 24px; }
+    </style>
+</head>
+<body>
+    <h2>УПРАВЛЕНИЕ ЙОГА-ШОУ</h2>
+    
+    <button class="btn pose-btn" onclick="changePose('pose1')">ФИГУРА 1</button>
+    <button class="btn pose-btn" onclick="changePose('pose2')">ФИГУРА 2</button>
+    <button class="btn pose-btn" onclick="changePose('pose3')">ФИГУРА 3</button>
+    
+    <hr>
+    <button class="btn check-btn" onclick="check()">ФИКСИРОВАТЬ РЕЗУЛЬТАТ</button>
+
+    <script>
+        const ADMIN_ID = 'medet_yoga_master_2026';
+        const peer = new Peer(ADMIN_ID);
+        let connections = [];
+
+        peer.on('connection', (conn) => {
+            connections.push(conn);
+        });
+
+        function changePose(name) {
+            connections.forEach(c => c.send({ type: 'CHANGE_POSE', pose: name }));
+        }
+
+        function check() {
+            connections.forEach(c => c.send({ type: 'CHECK' }));
+        }
+    </script>
+</body>
+</html>
