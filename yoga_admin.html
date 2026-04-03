@@ -13,22 +13,32 @@
     </style>
 </head>
 <body>
-    <h1>MEDET CONTROL</h1>
+    <h1>MEDET CONTROL PRO</h1>
+    <div id="status" style="margin-bottom: 20px; color: #00ffcc;">Ожидание экрана...</div>
     <button class="start" onclick="send('START')">СТАРТ ИГРЫ</button>
     <button class="next" onclick="send('NEXT')">СЛЕДУЮЩАЯ ПОЗА</button>
     <button class="stop" onclick="send('STOP')">ПАУЗА / СТОП</button>
 
     <script>
-        const ADMIN_ID = 'medet_yoga_master_2026';
+        const ADMIN_ID = 'medet_yoga_2026_pro'; 
         const peer = new Peer(ADMIN_ID);
         let connections = [];
 
+        peer.on('open', () => {
+            document.getElementById('status').innerText = "Панель готова. Откройте экран на ноутбуке.";
+        });
+
         peer.on('connection', (conn) => {
             connections.push(conn);
+            document.getElementById('status').innerText = "ЭКРАН ПОДКЛЮЧЕН!";
             alert("Экран подключен!");
         });
 
         function send(cmd) {
+            if (connections.length === 0) {
+                alert("Ошибка: Экран не подключен!");
+                return;
+            }
             connections.forEach(c => {
                 if (c.open) c.send(cmd);
             });
