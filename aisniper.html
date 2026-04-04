@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Teacher Assistant</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            background: #0a192f; /* Темно-синий, академический цвет */
+            color: white; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        
+        #container { 
+            position: relative; 
+            width: 90vw; 
+            height: 65vh; 
+            border-radius: 15px; 
+            overflow: hidden; 
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5); 
+            border: 3px solid #1e3a8a; 
+            background: #000;
+        }
+        
+        video { width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 1; transition: opacity 0.3s; }
+        
+        /* Слой для стоп-кадра */
+        #photoCanvas { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            position: absolute; 
+            z-index: 2; 
+            opacity: 0; 
+            transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.3s; 
+        }
+        
+        /* Настройки зума: scale(3) вместо scale(8) для мягкого приближения */
+        #container.zoomed #photoCanvas { 
+            opacity: 1; 
+            transform: scale(3) !important; 
+        } 
+        
+        #container.zoomed video { opacity: 0; }
+        #container.zoomed { border-color: #fbbf24; box-shadow: 0 0 40px rgba(251, 191, 36, 0.4); }
+
+        .controls { margin-top: 25px; display: flex; gap: 15px; z-index: 10; }
+        
+        button { 
+            padding: 12px 25px; 
+            font-size: 1rem; 
+            font-weight: 600; 
+            cursor: pointer; 
+            border: none; 
+            border-radius: 8px; 
+            text-transform: uppercase; 
+            transition: 0.2s; 
+            letter-spacing: 1px;
+        }
+        
+        #btn-pick { 
+            background: #fbbf24; 
+            color: #1e3a8a; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        #btn-pick:hover:not(:disabled) { background: #f59e0b; transform: translateY(-2px); }
+        
+        #btn-switch { background: #334155; color: white; }
+
+        button:disabled { background: #1e293b !important; color: #64748b; cursor: not-allowed; }
+        
+        #status { 
+            margin-bottom: 15px; 
+            font-size: 1.2rem; 
+            color: #fbbf24; 
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .counter { 
+            position: absolute; 
+            top: 15px; 
+            right: 20px; 
+            background: rgba(30, 58, 138, 0.8); 
+            padding: 6px 14px; 
+            border-radius: 10px; 
+            font-size: 0.9rem; 
+            border: 1px solid #fbbf24; 
+            z-index: 5; 
+            color: #fff; 
+        }
+
+        #owner-name { 
+            position: absolute; 
+            top: 15px; 
+            left: 20px; 
+            z-index: 5; 
+            font-size: 1rem; 
+            font-weight: bold; 
+            color: #fff;
+            background: rgba(0,0,0,0.4);
+            padding: 4px 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status">ИНТЕЛЛЕКТУАЛДЫ ЖҮЙЕ ЖҮКТЕЛУДЕ...</div>
+    
+    <div id="container">
+        <div id="owner-name">МҰҒАЛІМ: MEDET MUHAMEDZHANOV</div>
+        
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="photoCanvas"></canvas>
+        <div class="counter">ОҚУШЫЛАР САНЫ: <span id="count">0</span></div>
+    </div>
+
+    <div class="controls">
+        <button id="btn-switch" onclick="toggleCamera()">🔄 КАМЕРА</button>
+        <button id="btn-pick" disabled onclick="pickRandom()">🎯 ЖАУАП БЕРЕТІН ОҚУШЫ</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const photoCanvas = document.getElementById('photoCanvas');
+        const container = document.getElementById('container');
+        const btnPick = document.getElementById('btn-pick');
+        const status = document.getElementById('status');
+        const countSpan = document.getElementById('count');
+        
+        let detections = [];
+        let currentFacingMode = "environment"; // По умолчанию задняя камера для класса
+        let isLock = false;
+
+        async function init() {
+            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+            try {
+                await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+                status.innerText = "САБАҚҚА ДАЙЫН ✅";
+                startStream();
+            } catch (e) {
+                status.innerText = "ҚАТЕ: ЖҮЙЕ ЖҮКТЕЛМЕДІ";
+            }
+        }
+
+        async function startStream() {
+            if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: currentFacingMode, width: 1280, height: 720 } 
+                });
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    photoCanvas.width = video.videoWidth;
+                    photoCanvas.height = video.videoHeight;
+                    btnPick.disabled = false;
+                    runAI();
+                };
+            } catch (err) { status.innerText = "КАМЕРАҒА РҰҚСАТ ЖОҚ"; }
+        }
+
+        function toggleCamera() {
+            currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+            startStream();
+        }
+
+        async function runAI() {
+            setInterval(async () => {
+                if (!isLock && video.readyState === 4) {
+                    // Оптимизировано для обнаружения лиц в классе
+                    detections = await faceapi.detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }));
+                    countSpan.innerText = detections.length;
+                }
+            }, 600);
+        }
+
+        function pickRandom() {
+            if (detections.length === 0) {
+                status.innerText = "ОҚУШЫЛАР КӨРІНБЕЙДІ";
+                return;
+            }
+
+            isLock = true;
+            btnPick.disabled = true;
+            
+            // Выбор случайного ученика
+            const target = detections[Math.floor(Math.random() * detections.length)];
+            const { x, y, width, height } = target.box;
+
+            // Стоп-кадр
+            const ctx = photoCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
+
+            // Центрирование зума на лице
+            const cx = ((x + width / 2) / video.videoWidth) * 100;
+            const cy = ((y + height / 2) / video.videoHeight) * 100;
+
+            photoCanvas.style.transformOrigin = `${cx}% ${cy}%`;
+            
+            status.innerText = "ТАҢДАУ ЖАСАЛДЫ!";
+            container.classList.add('zoomed');
+
+            // Возврат через 4 секунды
+            setTimeout(() => {
+                container.classList.remove('zoomed');
+                setTimeout(() => {
+                    isLock = false;
+                    btnPick.disabled = false;
+                    status.innerText = "САБАҚҚА ДАЙЫН ✅";
+                }, 800);
+            }, 4000);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
